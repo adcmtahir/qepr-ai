@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QE Test Plan Reviewer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --high: #ef4444;
+      --high-bg: #fef2f2;
+      --medium: #f97316;
+      --medium-bg: #fff7ed;
+      --low: #eab308;
+      --low-bg: #fefce8;
+      --green: #16a34a;
+      --green-bg: #f0fdf4;
+      --green-border: #bbf7d0;
+      --radius: 8px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 32px 16px 64px;
+    }
+
+    .container { max-width: 760px; margin: 0 auto; }
+
+    /* ── Header ── */
+    .header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      gap: 12px;
+    }
+    h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 4px; }
+    .subtitle { color: var(--text-muted); font-size: 0.95rem; }
+    .settings-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .settings-btn:hover { border-color: var(--accent); background: #f5f3ff; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgb(0 0 0 / 0.45);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border-radius: 12px;
+      width: min(480px, calc(100vw - 32px));
+      box-shadow: 0 20px 60px rgb(0 0 0 / 0.25);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 22px 14px;
+      font-weight: 700;
+      font-size: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      color: var(--text-muted);
+      line-height: 1;
+      padding: 0 2px;
+    }
+    .modal-body { padding: 20px 22px 24px; }
+    .modal-hint {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      line-height: 1.6;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+    .modal-group { margin-bottom: 16px; }
+    .modal-saved {
+      display: none;
+      color: var(--green);
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-top: 12px;
+    }
+    .modal-saved.show { display: block; }
+
+    /* ── Toggle ── */
+    .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .toggle { position: relative; width: 40px; height: 22px; cursor: pointer; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: #cbd5e1;
+      border-radius: 99px;
+      transition: 0.2s;
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 16px; height: 16px;
+      left: 3px; top: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+    .toggle input:checked + .toggle-slider { background: var(--accent); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
+    .design-field { display: none; }
+    .design-field.visible { display: block; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin-bottom: 14px;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .optional-badge {
+      font-size: 0.68rem;
+      font-weight: 600;
+      background: #e2e8f0;
+      color: var(--text-muted);
+      padding: 2px 7px;
+      border-radius: 99px;
+    }
+
+    /* ── Form fields ── */
+    label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; }
+    .url-input-wrap { display: flex; align-items: center; gap: 8px; }
+    .url-input-wrap input, .modal-body input[type="password"], .modal-body input[type="text"] {
+      width: 100%;
+      padding: 9px 11px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-family: inherit;
+      background: var(--surface);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .url-input-wrap input:focus,
+    .modal-body input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgb(99 102 241 / 0.12);
+    }
+    .url-hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 5px; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 24px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .btn-primary { background: var(--accent); color: white; width: 100%; }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    /* ── Error ── */
+    .error-box {
+      background: var(--high-bg);
+      border: 1px solid #fca5a5;
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      color: #dc2626;
+      font-size: 0.875rem;
+      margin-bottom: 14px;
+      display: none;
+    }
+
+    /* ── Loading state ── */
+    .loading-state {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 22px;
+      margin-top: 16px;
+      text-align: center;
+    }
+    .loading-state.visible { display: block; }
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      margin: 0 auto 16px;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-status { font-weight: 600; font-size: 0.95rem; margin-bottom: 14px; }
+    .loading-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      text-align: left;
+      max-width: 340px;
+      margin: 0 auto;
+    }
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      padding: 5px 0;
+    }
+    .step-icon { width: 18px; text-align: center; flex-shrink: 0; }
+    .step.done { color: var(--green); }
+    .step.active { color: var(--accent); font-weight: 600; }
+    .step.error-step { color: var(--high); }
+
+    /* ── Results ── */
+    #results { margin-top: 32px; display: none; }
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      gap: 10px;
+    }
+    .results-title { font-size: 1.3rem; font-weight: 700; }
+    .reset-btn {
+      padding: 6px 14px;
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+    .reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .summary-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
+    .chip { padding: 4px 13px; border-radius: 99px; font-size: 0.78rem; font-weight: 700; }
+    .chip-high   { background: var(--high-bg);   color: var(--high);   border: 1px solid #fca5a5; }
+    .chip-medium { background: var(--medium-bg);  color: var(--medium); border: 1px solid #fdba74; }
+    .chip-low    { background: var(--low-bg);     color: #a16207;       border: 1px solid #fde047; }
+    .chip-total  { background: #f1f5f9; color: #475569; border: 1px solid var(--border); }
+
+    /* ── Feedback cards ── */
+    .feedback-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+    .feedback-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 13px 16px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .feedback-header:hover { background: #f8fafc; }
+    .sev-badge {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      white-space: nowrap;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .sev-high   { background: var(--high-bg);   color: var(--high); }
+    .sev-medium { background: var(--medium-bg); color: var(--medium); }
+    .sev-low    { background: var(--low-bg);    color: #a16207; }
+    .cat-badge {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: #f1f5f9;
+      color: #475569;
+      white-space: nowrap;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .feedback-issue { font-weight: 600; font-size: 0.88rem; flex: 1; line-height: 1.4; margin-top: 1px; }
+    .chevron { margin-left: auto; flex-shrink: 0; transition: transform 0.2s; color: var(--text-muted); margin-top: 1px; }
+    .feedback-card.open .chevron { transform: rotate(180deg); }
+    .feedback-body { display: none; padding: 0 16px 16px; border-top: 1px solid var(--border); }
+    .feedback-card.open .feedback-body { display: block; }
+    .detail-section { margin-top: 13px; }
+    .detail-label {
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+    }
+    .detail-text { font-size: 0.875rem; line-height: 1.6; }
+    .ref-item {
+      background: #f8fafc;
+      border-left: 3px solid var(--accent);
+      padding: 8px 10px;
+      border-radius: 0 4px 4px 0;
+      margin-bottom: 6px;
+      font-size: 0.8rem;
+    }
+    .ref-item .ref-source { font-weight: 600; color: var(--accent); margin-bottom: 2px; }
+    .ref-item .ref-quote  { font-style: italic; color: var(--text-muted); }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag {
+      background: #f1f5f9;
+      color: #475569;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    }
+    .suggestion-box {
+      background: var(--green-bg);
+      border: 1px solid var(--green-border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 0.875rem;
+      line-height: 1.65;
+      color: #15803d;
+    }
+    .no-issues { text-align: center; padding: 48px; color: var(--text-muted); }
+    .no-issues .check { font-size: 2.5rem; margin-bottom: 8px; }
+
+    @media (max-width: 600px) {
+      .url-input-wrap { flex-direction: column; align-items: stretch; }
+      .header-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ── Header ── -->
+  <div class="header-row">
+    <div>
+      <h1>🔍 QE Test Plan Reviewer</h1>
+      <p class="subtitle">Paste Confluence URLs and click Analyze — results appear right here.</p>
+    </div>
+    <button class="settings-btn" onclick="openSettings()">⚙️ Settings</button>
+  </div>
+
+  <!-- ── Settings Modal ── -->
+  <div class="modal-overlay" id="modalOverlay" onclick="closeSettings(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <span>⚙️ Settings</span>
+        <button class="modal-close" onclick="closeSettings()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-hint">
+          Credentials are saved in your browser only and never sent externally.
+        </div>
+
+        <!-- AI Provider -->
+        <div class="modal-group">
+          <label for="settingsProvider">AI Provider</label>
+          <select id="settingsProvider" onchange="onProviderChange()"
+            style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:6px;font-size:0.875rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;">
+            <option value="github">GitHub Models (free — use your GitHub token)</option>
+            <option value="openai">OpenAI (GPT-4o)</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+          </select>
+        </div>
+
+        <!-- Dynamic AI key field -->
+        <div class="modal-group" id="aiKeyGroup">
+          <label for="settingsAiKey" id="aiKeyLabel">GitHub Personal Access Token</label>
+          <input type="password" id="settingsAiKey" placeholder="" />
+          <p class="url-hint" id="aiKeyHint"></p>
+        </div>
+
+        <!-- Confluence -->
+        <div class="modal-group">
+          <label for="settingsConfluenceToken">Confluence Personal Access Token</label>
+          <input type="password" id="settingsConfluenceToken" placeholder="Paste your Confluence PAT here" />
+          <p class="url-hint">Confluence → Profile picture → Personal Access Tokens → Create token</p>
+        </div>
+
+        <button class="btn btn-primary" style="margin-top:6px" onclick="saveSettings()">Save Settings</button>
+        <div class="modal-saved" id="modalSaved">Settings saved!</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Spec ── -->
+  <div class="card">
+    <div class="card-title">📄 Spec</div>
+    <label for="specUrl">Confluence Page URL</label>
+    <div class="url-input-wrap">
+      <input type="text" id="specUrl" placeholder="https://your-org.atlassian.net/wiki/spaces/…" />
+    </div>
+    <p class="url-hint">The feature specification / requirements document.</p>
+  </div>
+
+  <!-- ── Test Plan ── -->
+  <div class="card">
+    <div class="card-title">✅ Test Plan</div>
+    <label for="tpUrl">Confluence Page URL</label>
+    <div class="url-input-wrap">
+      <input type="text" id="tpUrl" placeholder="https://your-org.atlassian.net/wiki/spaces/…" />
+    </div>
+    <p class="url-hint">The test plan document to be reviewed.</p>
+  </div>
+
+  <!-- ── Design (optional) ── -->
+  <div class="card">
+    <div class="card-title">
+      🏗️ Design Document
+      <span class="optional-badge">optional</span>
+    </div>
+    <div class="toggle-row">
+      <label class="toggle">
+        <input type="checkbox" id="includeDesign" />
+        <span class="toggle-slider"></span>
+      </label>
+      <span style="font-size:0.875rem; color:var(--text-muted)">Include a Technical Design document</span>
+    </div>
+    <div class="design-field" id="designField">
+      <label for="designUrl">Confluence Page URL</label>
+      <div class="url-input-wrap">
+        <input type="text" id="designUrl" placeholder="https://your-org.atlassian.net/wiki/spaces/…" />
+      </div>
+      <p class="url-hint">The technical design / architecture document.</p>
+    </div>
+  </div>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <button class="btn btn-primary" id="analyzeBtn" onclick="runAnalysis()">🔍 Analyze Test Plan</button>
+
+  <!-- ── Loading state ── -->
+  <div class="loading-state" id="loadingState">
+    <div class="spinner"></div>
+    <div class="loading-status" id="loadingStatus">Starting analysis…</div>
+    <div class="loading-steps" id="loadingSteps"></div>
+  </div>
+
+  <!-- ── Results ── -->
+  <div id="results">
+    <div class="results-header">
+      <div class="results-title">Analysis Results</div>
+      <button class="reset-btn" onclick="resetForm()">← New Analysis</button>
+    </div>
+    <div class="summary-chips" id="summaryChips"></div>
+    <div id="feedbackList"></div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+  /* ── Design toggle ── */
+  document.getElementById('includeDesign').addEventListener('change', function () {
+    document.getElementById('designField').classList.toggle('visible', this.checked);
+  });
+
+  /* ── Expand/collapse feedback cards ── */
+  document.addEventListener('click', function (e) {
+    const h = e.target.closest('.feedback-header');
+    if (h) h.closest('.feedback-card').classList.toggle('open');
+  });
+
+  /* ── Settings ── */
+  const PROVIDER_INFO = {
+    github: {
+      label: 'GitHub Personal Access Token',
+      placeholder: 'github_pat_...',
+      hint: 'github.com → Settings → Developer settings → Personal access tokens → Fine-grained → scope: <strong>models:read</strong>. Free for all GitHub users.',
+    },
+    openai: {
+      label: 'OpenAI API Key',
+      placeholder: 'sk-...',
+      hint: 'Get from <strong>platform.openai.com</strong> → API Keys. Usage costs apply.',
+    },
+    anthropic: {
+      label: 'Anthropic API Key',
+      placeholder: 'sk-ant-...',
+      hint: 'Get from <strong>console.anthropic.com</strong> → API Keys. Usage costs apply.',
+    },
+  };
+
+  function onProviderChange() {
+    const p = document.getElementById('settingsProvider').value;
+    const info = PROVIDER_INFO[p];
+    document.getElementById('aiKeyLabel').textContent = info.label;
+    document.getElementById('settingsAiKey').placeholder = info.placeholder;
+    document.getElementById('aiKeyHint').innerHTML = info.hint;
+  }
+
+  async function openSettings() {
+    // Load saved values from server (.env) first, fall back to localStorage
+    try {
+      const r = await fetch('/api/config');
+      if (r.ok) {
+        const cfg = await r.json();
+        if (cfg.ai_provider) localStorage.setItem('ai_provider', cfg.ai_provider);
+        if (cfg.ai_key)      localStorage.setItem('ai_key', cfg.ai_key);
+        if (cfg.confluence_token) localStorage.setItem('confluence_token', cfg.confluence_token);
+      }
+    } catch (_) {}
+
+    const savedProvider = localStorage.getItem('ai_provider') || 'github';
+    document.getElementById('settingsProvider').value = savedProvider;
+    onProviderChange();
+    document.getElementById('settingsAiKey').value           = localStorage.getItem('ai_key') || '';
+    document.getElementById('settingsConfluenceToken').value = localStorage.getItem('confluence_token') || '';
+    document.getElementById('modalSaved').classList.remove('show');
+    document.getElementById('modalOverlay').classList.add('open');
+  }
+
+  function closeSettings(e) {
+    if (!e || e.target === document.getElementById('modalOverlay') || !e.target.closest) {
+      document.getElementById('modalOverlay').classList.remove('open');
+    }
+  }
+
+  async function saveSettings() {
+    const provider = document.getElementById('settingsProvider').value;
+    const aiKey    = document.getElementById('settingsAiKey').value.trim();
+    const ct       = document.getElementById('settingsConfluenceToken').value.trim();
+
+    // Save to localStorage (instant)
+    localStorage.setItem('ai_provider', provider);
+    if (aiKey) localStorage.setItem('ai_key', aiKey);
+    if (ct)    localStorage.setItem('confluence_token', ct);
+
+    // Also persist to server .env (survives browser clears)
+    try {
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ai_provider: provider, ai_key: aiKey, confluence_token: ct }),
+      });
+    } catch (_) {}
+
+    document.getElementById('modalSaved').classList.add('show');
+    setTimeout(() => {
+      document.getElementById('modalOverlay').classList.remove('open');
+      document.getElementById('modalSaved').classList.remove('show');
+    }, 1200);
+  }
+
+  // Init provider UI on load
+  onProviderChange();
+
+  // Auto-load saved credentials from server on startup
+  (async () => {
+    try {
+      const r = await fetch('/api/config');
+      if (r.ok) {
+        const cfg = await r.json();
+        if (cfg.ai_provider) localStorage.setItem('ai_provider', cfg.ai_provider);
+        if (cfg.ai_key)      localStorage.setItem('ai_key', cfg.ai_key);
+        if (cfg.confluence_token) localStorage.setItem('confluence_token', cfg.confluence_token);
+      }
+    } catch (_) {}
+  })();
+
+  /* ── Step progress helpers ── */
+  const STEPS = [
+    { id: 's-spec',   label: 'Fetching Spec from Confluence' },
+    { id: 's-tp',     label: 'Fetching Test Plan from Confluence' },
+    { id: 's-design', label: 'Fetching Design Document from Confluence' },
+    { id: 's-ai',     label: 'Analyzing with Claude AI' },
+  ];
+
+  function initSteps(includeDesign) {
+    const container = document.getElementById('loadingSteps');
+    const steps = includeDesign ? STEPS : STEPS.filter(s => s.id !== 's-design');
+    container.innerHTML = steps.map(s =>
+      `<div class="step" id="${s.id}"><span class="step-icon">○</span><span>${s.label}</span></div>`
+    ).join('');
+  }
+
+  function setStep(id, state) { // state: 'active' | 'done' | 'error-step'
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = `step ${state}`;
+    const icons = { active: '◉', done: '✓', 'error-step': '✕' };
+    el.querySelector('.step-icon').textContent = icons[state] || '○';
+  }
+
+  /* ── Main analysis ── */
+  async function runAnalysis() {
+    const errorBox   = document.getElementById('errorBox');
+    const loadingDiv = document.getElementById('loadingState');
+    const resultsDiv = document.getElementById('results');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+
+    errorBox.style.display = 'none';
+    resultsDiv.style.display = 'none';
+
+    const specUrl     = document.getElementById('specUrl').value.trim();
+    const tpUrl       = document.getElementById('tpUrl').value.trim();
+    const withDesign  = document.getElementById('includeDesign').checked;
+    const designUrl   = withDesign ? document.getElementById('designUrl').value.trim() : '';
+
+    if (!specUrl)                          return showError('Please enter the Confluence URL for the Spec.');
+    if (!tpUrl)                            return showError('Please enter the Confluence URL for the Test Plan.');
+    if (withDesign && !designUrl)          return showError('Please enter the Confluence URL for the Design document, or disable it.');
+
+    const confluenceToken = localStorage.getItem('confluence_token') || '';
+    const aiKey           = localStorage.getItem('ai_key') || '';
+    const provider        = localStorage.getItem('ai_provider') || 'github';
+
+    if (!confluenceToken || !aiKey) {
+      openSettings();
+      showError('Please configure your Confluence token and AI key in Settings first.');
+      return;
+    }
+
+    // Show loading UI
+    analyzeBtn.disabled = true;
+    loadingDiv.classList.add('visible');
+    initSteps(withDesign);
+    document.getElementById('loadingStatus').textContent = 'Fetching Confluence pages…';
+    loadingDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    setStep('s-spec', 'active');
+    if (withDesign) setStep('s-design', '');
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Confluence-Token': confluenceToken,
+      'X-AI-Key': aiKey,
+    };
+
+    try {
+      await delay(400);
+      setStep('s-spec', 'done');
+      setStep('s-tp', 'active');
+      await delay(300);
+      setStep('s-tp', 'done');
+      if (withDesign) { setStep('s-design', 'active'); await delay(300); setStep('s-design', 'done'); }
+
+      setStep('s-ai', 'active');
+      const aiMsg = provider === 'github'
+        ? 'Analyzing section by section (GitHub Models — this takes 1–3 min)…'
+        : 'Analyzing with AI… (this takes ~30 s)';
+      document.getElementById('loadingStatus').textContent = aiMsg;
+
+      const resp = await fetch('/api/analyze', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          spec_url: specUrl,
+          test_plan_url: tpUrl,
+          design_url: designUrl,
+          provider,
+        }),
+      });
+
+      const data = await resp.json();
+
+      if (!resp.ok || data.error) {
+        setStep('s-ai', 'error-step');
+        throw new Error(data.error || `Server error ${resp.status}`);
+      }
+
+      setStep('s-ai', 'done');
+      document.getElementById('loadingStatus').textContent = 'Analysis complete!';
+      await delay(600);
+
+      loadingDiv.classList.remove('visible');
+      analyzeBtn.disabled = false;
+      renderFeedback(data);
+
+    } catch (err) {
+      loadingDiv.classList.remove('visible');
+      analyzeBtn.disabled = false;
+      showError(err.message || 'An unexpected error occurred.');
+    }
+  }
+
+  function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  function resetForm() {
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('errorBox').style.display = 'none';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ── Render results ── */
+  function renderFeedback(data) {
+    const results      = document.getElementById('results');
+    const summaryChips = document.getElementById('summaryChips');
+    const feedbackList = document.getElementById('feedbackList');
+
+    const items = data.feedback || [];
+    if (!items.length) {
+      feedbackList.innerHTML = '<div class="no-issues"><div class="check">✅</div><div>No issues found — the test plan looks comprehensive!</div></div>';
+      summaryChips.innerHTML = '';
+      results.style.display = 'block';
+      results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
+    const counts = { high: 0, medium: 0, low: 0 };
+    items.forEach(i => counts[(i.severity || '').toLowerCase()]++);
+
+    summaryChips.innerHTML = [
+      `<span class="chip chip-total">${items.length} total</span>`,
+      counts.high   ? `<span class="chip chip-high">${counts.high} High</span>`     : '',
+      counts.medium ? `<span class="chip chip-medium">${counts.medium} Medium</span>` : '',
+      counts.low    ? `<span class="chip chip-low">${counts.low} Low</span>`         : '',
+    ].join('');
+
+    feedbackList.innerHTML = items.map(item => {
+      const refs = (item.reference || []).map(r => `
+        <div class="ref-item">
+          <div class="ref-source">📌 ${esc(r.doc_title)} › ${esc(r.heading)}</div>
+          ${r.quote ? `<div class="ref-quote">"${esc(r.quote)}"</div>` : ''}
+        </div>`).join('');
+
+      const reqIds = (item.requirement_ids || []).length
+        ? `<div class="detail-section"><div class="detail-label">Requirement IDs</div>
+           <div class="tags">${item.requirement_ids.map(id => `<span class="tag">${esc(id)}</span>`).join('')}</div></div>` : '';
+
+      const tcs = (item.affected_test_cases || []).length
+        ? `<div class="detail-section"><div class="detail-label">Affected Test Cases</div>
+           <div class="tags">${item.affected_test_cases.map(tc => `<span class="tag">${esc(tc)}</span>`).join('')}</div></div>` : '';
+
+      return `
+        <div class="feedback-card">
+          <div class="feedback-header">
+            <span class="sev-badge sev-${item.severity.toLowerCase()}">${esc(item.severity)}</span>
+            <span class="cat-badge">${esc(item.category)}</span>
+            <span class="feedback-issue">${esc(item.issue)}</span>
+            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="feedback-body">
+            <div class="detail-section">
+              <div class="detail-label">Why it matters</div>
+              <div class="detail-text">${esc(item.reason)}</div>
+            </div>
+            ${refs ? `<div class="detail-section"><div class="detail-label">References</div>${refs}</div>` : ''}
+            ${reqIds}${tcs}
+            <div class="detail-section">
+              <div class="detail-label">Suggestion</div>
+              <div class="suggestion-box">💡 ${esc(item.suggestion)}</div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    results.style.display = 'block';
+    results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function showError(msg) {
+    const box = document.getElementById('errorBox');
+    box.textContent = msg;
+    box.style.display = 'block';
+  }
+
+  function esc(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>
